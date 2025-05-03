@@ -1,6 +1,5 @@
 mod cli;
 mod downloader;
-mod logger;
 mod source;
 
 use std::path::PathBuf;
@@ -8,11 +7,11 @@ use std::path::PathBuf;
 use cli::Opt;
 use colored::Colorize;
 use downloader::download_repos;
-use logger::*;
 use source::parse_source;
 use structopt::StructOpt;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let opts = Opt::from_args();
     let source: PathBuf = opts.source;
 
@@ -29,14 +28,19 @@ fn main() {
     // Read source file
     let uris: Vec<(String, String)> = parse_source(&source);
     if uris.is_empty() {
-        logger::log(Level::Warn, "No valid URIs found in source file");
+        eprintln!(
+            "{} No valid URIs found in source file",
+            "[WARNING]".truecolor(214, 143, 0)
+        );
     }
 
     // Download
-    if let Some(paths) = download_repos(uris) {
-        logger::log(
-            Level::Info,
-            format!("Downloaded {} repos onto `zip`", paths.len()).as_str(),
+    let download_workers = 10;
+    if let Some(paths) = download_repos(uris, download_workers).await {
+        println!(
+            "{} Downloaded {} repos onto `zip`",
+            "[INFO]".cyan(),
+            paths.len(),
         );
     } else {
         panic!("Unable to download any repo from source file.")
