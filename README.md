@@ -2,7 +2,7 @@
 
 A Rust tool for curating and processing GitHub repos as datasets
 
-## Installation
+### Installation
 
 ```bash
 cargo install --path .
