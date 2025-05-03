@@ -7,10 +7,7 @@ use std::{
 
 use colored::Colorize;
 
-use crate::{
-    logger::{self, Level},
-    source::parse_source,
-};
+use crate::logger::{self, Level};
 
 fn download_repo(user: &String, repo: &String, branch: &str) -> Result<PathBuf, Box<dyn Error>> {
     let url = format!(
@@ -28,14 +25,7 @@ fn download_repo(user: &String, repo: &String, branch: &str) -> Result<PathBuf, 
     Ok(abspath)
 }
 
-pub fn download_repos(source: &PathBuf) -> Option<Vec<PathBuf>> {
-    // Read
-    let uris: Vec<(String, String)> = parse_source(source);
-    if uris.is_empty() {
-        logger::log(Level::Warn, "No valid URIs found in source file");
-        return None;
-    }
-
+pub fn download_repos(uris: Vec<(String, String)>) -> Option<Vec<PathBuf>> {
     // Download & Write
     let destination_dir = Path::new("./zip/");
     fs::create_dir_all(destination_dir).ok()?;

@@ -9,6 +9,7 @@ use cli::Opt;
 use colored::Colorize;
 use downloader::download_repos;
 use logger::*;
+use source::parse_source;
 use structopt::StructOpt;
 
 fn main() {
@@ -24,7 +25,15 @@ fn main() {
     }
 
     println!("Source: {}", source.to_string_lossy().blue());
-    if let Some(paths) = download_repos(&source) {
+
+    // Read source file
+    let uris: Vec<(String, String)> = parse_source(&source);
+    if uris.is_empty() {
+        logger::log(Level::Warn, "No valid URIs found in source file");
+    }
+
+    // Download
+    if let Some(paths) = download_repos(uris) {
         logger::log(
             Level::Info,
             format!("Downloaded {} repos onto `zip`", paths.len()).as_str(),
