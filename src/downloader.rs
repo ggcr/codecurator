@@ -66,6 +66,7 @@ pub async fn download_repos(uris: Vec<(String, String)>, workers: usize) -> Opti
             }
         }
         .await;
+
         match result {
             Ok(path) => {
                 println!("{} {}/{}", "[DOWNLOADED]".green(), user, repo);
