@@ -18,21 +18,33 @@ enum DownloadError {
     Http(#[from] reqwest::Error),
     #[error("Filesystem error {0}")]
     Io(#[from] std::io::Error),
+    #[error("Content missmatch")]
+    ContentMismatch,
 }
 
-async fn fetch(url: String) -> Result<Bytes, DownloadError> {
+async fn download_bytes(url: String) -> Result<Bytes, DownloadError> {
     let resp = reqwest::get(url).await?.error_for_status()?;
     let content = resp.bytes().await?;
     Ok(content)
 }
 
-async fn store(filepath: String, content: Bytes) -> Result<PathBuf, DownloadError> {
+async fn write_bytes_to_file(filepath: String, content: Bytes) -> Result<PathBuf, DownloadError> {
     tokio::fs::write(&filepath, content).await?;
     let path = tokio::fs::canonicalize(&filepath).await?;
     Ok(path)
 }
 
-async fn download_repo(
+async fn are_equal(contents: Bytes, filepath: &str) -> Result<(), DownloadError> {
+    // Read filepath, we know it exists
+    // still could be corrupted!
+    let dest_content = tokio::fs::read(filepath).await?;
+    if contents != dest_content {
+        return Err(DownloadError::ContentMismatch);
+    }
+    Ok(())
+}
+
+async fn download_repo_zip(
     user: &String,
     repo: &String,
     branch: &str,
@@ -42,10 +54,17 @@ async fn download_repo(
         "https://github.com/{}/{}/archive/refs/heads/{}.zip",
         user, repo, branch
     );
-    let content = fetch(url).await?;
+    let content = download_bytes(url).await?;
     // Store
     let filepath = format!("./zip/{}-{}.zip", user, repo);
-    let zip_path = store(filepath, content).await?;
+    let zip_path = PathBuf::from(&filepath);
+    // Check the checksum between content (Bytes) and the file in disk
+    if tokio::fs::try_exists(&filepath).await.unwrap_or(false)
+        && are_equal(content.clone(), &filepath).await.is_ok()
+    {
+        return Ok(zip_path);
+    }
+    write_bytes_to_file(filepath, content).await?;
     Ok(zip_path)
 }
 
@@ -57,11 +76,11 @@ pub async fn download_repos(uris: Vec<(String, String)>, workers: usize) -> Opti
     // We try first downloading from main, if err, we try on master
     let futures = futures::stream::iter(uris.into_iter().map(|(user, repo)| async move {
         let result = async {
-            match download_repo(&user, &repo, "main").await {
+            match download_repo_zip(&user, &repo, "main").await {
                 Ok(path) => Ok(path),
                 Err(_) => {
                     sleep(Duration::from_secs(1)).await;
-                    download_repo(&user, &repo, "master").await
+                    download_repo_zip(&user, &repo, "master").await
                 }
             }
         }
@@ -69,11 +88,11 @@ pub async fn download_repos(uris: Vec<(String, String)>, workers: usize) -> Opti
 
         match result {
             Ok(path) => {
-                println!("{} {}/{}", "[DOWNLOADED]".green(), user, repo);
+                println!("\t{}:  {}/{}", "Downloaded".green(), user, repo);
                 Some(path)
             }
             Err(e) => {
-                println!("{} {}", "[ERROR]".red(), e);
+                println!("\t{}:  {}", "Error".red(), e);
                 None
             }
         }
