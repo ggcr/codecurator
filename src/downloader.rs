@@ -18,8 +18,6 @@ enum DownloadError {
     Http(#[from] reqwest::Error),
     #[error("Filesystem error {0}")]
     Io(#[from] std::io::Error),
-    #[error("Content missmatch")]
-    ContentMismatch,
 }
 
 async fn download_bytes(url: String) -> Result<Bytes, DownloadError> {
@@ -34,14 +32,14 @@ async fn write_bytes_to_file(filepath: String, content: Bytes) -> Result<PathBuf
     Ok(path)
 }
 
-async fn are_equal(contents: Bytes, filepath: &str) -> Result<(), DownloadError> {
+async fn are_equal(contents: Bytes, filepath: &str) -> Option<()> {
     // Read filepath, we know it exists
     // still could be corrupted!
-    let dest_content = tokio::fs::read(filepath).await?;
+    let dest_content = tokio::fs::read(filepath).await.ok()?;
     if contents != dest_content {
-        return Err(DownloadError::ContentMismatch);
+        return None;
     }
-    Ok(())
+    Some(())
 }
 
 async fn download_repo_zip(
@@ -60,7 +58,7 @@ async fn download_repo_zip(
     let zip_path = PathBuf::from(&filepath);
     // Check the checksum between content (Bytes) and the file in disk
     if tokio::fs::try_exists(&filepath).await.unwrap_or(false)
-        && are_equal(content.clone(), &filepath).await.is_ok()
+        && are_equal(content.clone(), &filepath).await.is_some()
     {
         return Ok(zip_path);
     }
