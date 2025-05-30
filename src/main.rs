@@ -35,7 +35,7 @@ async fn main() {
     }
 
     // Download
-    let download_workers = 10;
+    let download_workers = 16;
     if let Some(paths) = download_repos(uris, download_workers).await {
         println!(
             "{} Downloaded {} repos onto `zip`",

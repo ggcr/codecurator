@@ -20,13 +20,27 @@ enum DownloadError {
     Io(#[from] std::io::Error),
 }
 
-async fn download_bytes(url: String) -> Result<Bytes, DownloadError> {
-    let resp = reqwest::get(url).await?.error_for_status()?;
+async fn download_bytes(client: &reqwest::Client, url: &str) -> Result<Bytes, DownloadError> {
+    let resp = client
+        .get(url)
+        .header(reqwest::header::USER_AGENT, "Rust CodeCurator")
+        .send()
+        .await?
+        .error_for_status()?;
     let content = resp.bytes().await?;
     Ok(content)
 }
 
-async fn write_bytes_to_file(filepath: String, content: Bytes) -> Result<PathBuf, DownloadError> {
+async fn get_etag(client: &reqwest::Client, url: &str) -> Option<String> {
+    let resp = client.head(url).send().await.ok()?;
+    resp.headers()
+        .get("etag")?
+        .to_str()
+        .ok()
+        .map(|s| s.trim_matches('"').to_string())
+}
+
+async fn write_bytes_to_file(filepath: &str, content: Bytes) -> Result<PathBuf, DownloadError> {
     tokio::fs::write(&filepath, content).await?;
     let path = tokio::fs::canonicalize(&filepath).await?;
     Ok(path)
@@ -47,23 +61,36 @@ async fn download_repo_zip(
     repo: &String,
     branch: &str,
 ) -> Result<PathBuf, DownloadError> {
-    // Download
+    let client = reqwest::Client::new();
+
+    // Define remote zip URL and local filepath
     let url = format!(
         "https://github.com/{}/{}/archive/refs/heads/{}.zip",
         user, repo, branch
     );
-    let content = download_bytes(url).await?;
-    // Store
-    let filepath = format!("./zip/{}-{}.zip", user, repo);
-    let zip_path = PathBuf::from(&filepath);
+
+    let mut filepath = format!("./zip/{}-{}.zip", user, repo);
+
+    // Fetch the latest commit SHA and check if we have it in local
+    if let Some(etag) = get_etag(&client, &url).await {
+        filepath = format!("./zip/{}-{}_{}.zip", user, repo, etag);
+        if tokio::fs::try_exists(&filepath).await.unwrap_or(false) {
+            return Ok(PathBuf::from(&filepath));
+        }
+    }
+
+    let content = download_bytes(&client, &url).await?;
+
     // Check the checksum between content (Bytes) and the file in disk
     if tokio::fs::try_exists(&filepath).await.unwrap_or(false)
         && are_equal(content.clone(), &filepath).await.is_some()
     {
-        return Ok(zip_path);
+        return Ok(PathBuf::from(&filepath));
     }
-    write_bytes_to_file(filepath, content).await?;
-    Ok(zip_path)
+
+    write_bytes_to_file(&filepath, content).await?;
+
+    Ok(PathBuf::from(&filepath))
 }
 
 pub async fn download_repos(uris: Vec<(String, String)>, workers: usize) -> Option<Vec<PathBuf>> {
