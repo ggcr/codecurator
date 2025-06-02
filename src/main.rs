@@ -1,12 +1,16 @@
 mod cli;
 mod downloader;
+mod extractor;
 mod source;
 
+use std::path::Path;
 use std::path::PathBuf;
 
 use cli::Opt;
 use colored::Colorize;
 use downloader::download_repos;
+use extractor::extract_text;
+use extractor::read_linguist;
 use source::parse_source;
 use structopt::StructOpt;
 
@@ -36,13 +40,13 @@ async fn main() {
 
     // Download
     let download_workers = 16;
-    if let Some(paths) = download_repos(uris, download_workers).await {
-        println!(
-            "{} Downloaded {} repos onto `zip`",
-            "[INFO]".cyan(),
-            paths.len(),
-        );
-    } else {
-        panic!("Unable to download any repo from source file.")
-    }
+    let paths = download_repos(uris, download_workers)
+        .await
+        .expect("No content has been downloaded.");
+
+    // Extract
+    let linguist_file_types = read_linguist(Path::new("vendor/languages.yml"))
+        .expect("Unable to read linguist languages yaml");
+    let extract_workers = 32;
+    let paths = extract_text(paths, linguist_file_types, extract_workers);
 }
