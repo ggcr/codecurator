@@ -14,8 +14,7 @@ use yaml_rust::YamlLoader;
 // 4. Write
 
 pub fn read_linguist(path: &Path) -> anyhow::Result<HashMap<String, String>> {
-    let p = path.to_path_buf();
-    let fc = std::fs::read_to_string(p)?;
+    let fc = std::fs::read_to_string(path)?;
     let docs = YamlLoader::load_from_str(&fc).unwrap();
     let doc = &docs[0];
     let mut ret: HashMap<String, String> = HashMap::new();
@@ -32,6 +31,16 @@ pub fn read_linguist(path: &Path) -> anyhow::Result<HashMap<String, String>> {
     Ok(ret)
 }
 
+fn parse_ext(file: &zip::read::ZipFile<'_, BufReader<fs::File>>) -> Option<String> {
+    let split_ext: Vec<&str> = file.name().splitn(2, ".").collect();
+    if split_ext.len() == 2 {
+        let mut ext = split_ext.last()?.to_string();
+        ext.insert_str(0, ".");
+        return Some(ext);
+    }
+    None
+}
+
 pub fn extract_text(
     zip_paths: Vec<PathBuf>,
     file_types: HashMap<String, String>,
@@ -45,19 +54,21 @@ pub fn extract_text(
         // Open file
         let f = fs::File::open(&zip_path).ok()?;
         let reader = BufReader::new(f);
+
         // Zip Reader
         let mut zip = zip::ZipArchive::new(reader).ok()?;
 
         for i in 0..zip.len() {
             let file = zip.by_index(i).ok()?;
             // If we are in a file + it has extension
-            let try_ext: Vec<&str> = file.name().splitn(2, ".").collect();
-            if file.is_file() && (try_ext.len() == 2 && try_ext.last().is_some()) {
-                println!(
-                    "Filename: {} \t Ext: {}",
-                    file.name(),
-                    try_ext.last().unwrap()
-                );
+            let Some(ext) = parse_ext(&file) else {
+                continue;
+            };
+            if file.is_file()
+                && file_types.contains_key(&ext)
+                && file_types.get(&ext).unwrap() == "programming"
+            {
+                println!("{}", file.name());
             }
         }
     }
