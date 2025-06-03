@@ -36,11 +36,13 @@ fn read_linguist(path: &Path) -> anyhow::Result<HashMap<String, String>> {
         let Some(file_type) = v["type"].as_str() else {
             continue;
         };
-        if let Some(ext_list) = v["extensions"].as_vec() {
-            for ext in ext_list {
-                ret.insert(ext.clone().into_string().unwrap(), file_type.to_owned());
-            }
-        };
+        if file_type == "programming" {
+            if let Some(ext_list) = v["extensions"].as_vec() {
+                for ext in ext_list {
+                    ret.insert(ext.clone().into_string().unwrap(), file_type.to_owned());
+                }
+            };
+        }
     }
     if ret.is_empty() {
         return Err(anyhow::Error::msg("Linguist yml is empty"));
