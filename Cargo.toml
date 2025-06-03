@@ -11,11 +11,15 @@ colored = "3.0.0"
 futures = "0.3.31"
 futures-util = "0.3.31"
 itertools = "0.14.0"
+jsonl = "4.0.1"
 reqwest = { version = "0.12.15", features = ["blocking"] }
+serde = "1.0.219"
 serde-jsonlines = "0.7.0"
 serde_json = "1.0.140"
 structopt = "0.3.26"
 thiserror = "2.0.12"
+tokenizers = { version = "0.21.1", features = ["http"] }
 tokio = { version = "1.44.2", features = ["fs", "full"] }
+uuid = { version = "1.17.0", features = ["v4"] }
 yaml-rust = "0.4.5"
 zip = "4.0.0"

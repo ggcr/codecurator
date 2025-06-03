@@ -13,6 +13,7 @@ use extractor::extract_text;
 use extractor::read_linguist;
 use source::parse_source;
 use structopt::StructOpt;
+use tokenizers::tokenizer::{Result, Tokenizer};
 
 #[tokio::main]
 async fn main() {
@@ -45,8 +46,10 @@ async fn main() {
         .expect("No content has been downloaded.");
 
     // Extract
+    let gpt2tokenizer = Tokenizer::from_pretrained("openai-community/gpt2", None)
+        .expect("Failed to load the tokenier");
     let linguist_file_types = read_linguist(Path::new("vendor/languages.yml"))
         .expect("Unable to read linguist languages yaml");
     let extract_workers = 32;
-    let paths = extract_text(paths, linguist_file_types, extract_workers);
+    let paths = extract_text(paths, linguist_file_types, gpt2tokenizer, extract_workers);
 }
