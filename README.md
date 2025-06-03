@@ -5,15 +5,15 @@ An end-to-end tool for curating and processing GitHub repos as datasets
 - Fast and parallel download and processing
 - Filters out non-code files
 - GPT2 BPE tokenization
-- **JSONL Output**: each file inside a repo is written with the following fields: 
+- JSONL Output: each file inside a repo is written with the following fields: 
 
    ```jsonl
   {
     "text": "print(\"Hello, world!\")",
     "id": "5ff8add7-2b1f-4cf4-a9d1-a70357528735",
-    "path": "hello.py",
+    "path": "repo_name/src/hello.py",
     "file_type": "programming",
-    "n_tokens": 3
+    "n_tokens": 9
   }
    ```
 
