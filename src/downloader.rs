@@ -13,7 +13,7 @@ use tokio::time::sleep;
 // To avoid the usage of Box<dyn Error>
 // With this we catch both errors either from reqwest or from fs
 #[derive(Debug, Error)]
-enum DownloadError {
+pub enum DownloadError {
     #[error("Network error {0}")]
     Http(#[from] reqwest::Error),
     #[error("Filesystem error {0}")]

@@ -1,15 +1,18 @@
 use std::{
     collections::HashMap,
-    fs::{self, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::{BufWriter, Read},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
+use colored::Colorize;
+use rayon::prelude::*;
 use serde::Serialize;
 use std::io::BufReader;
 use tokenizers::Tokenizer;
 use uuid::Uuid;
-use yaml_rust::YamlLoader;
+use zip::ZipArchive;
 
 #[derive(Serialize)]
 struct Record {
@@ -18,24 +21,6 @@ struct Record {
     path: String,
     file_type: String,
     n_tokens: usize,
-}
-
-pub fn read_linguist(path: &Path) -> anyhow::Result<HashMap<String, String>> {
-    let fc = std::fs::read_to_string(path)?;
-    let docs = YamlLoader::load_from_str(&fc)?;
-    let doc = &docs[0];
-    let mut ret: HashMap<String, String> = HashMap::new();
-    for (_, v) in doc.as_hash().unwrap() {
-        let Some(file_type) = v["type"].as_str() else {
-            continue;
-        };
-        if let Some(ext_list) = v["extensions"].as_vec() {
-            for ext in ext_list {
-                ret.insert(ext.clone().into_string().unwrap(), file_type.to_owned());
-            }
-        };
-    }
-    Ok(ret)
 }
 
 fn parse_ext(file: &zip::read::ZipFile<'_, BufReader<fs::File>>) -> Option<String> {
@@ -48,10 +33,14 @@ fn parse_ext(file: &zip::read::ZipFile<'_, BufReader<fs::File>>) -> Option<Strin
     None
 }
 
-fn write_repo_jsonl(dest_dir: &Path, zip_path: &Path, r: &Record) -> Option<()> {
+fn get_zip_name(zip_path: &Path) -> Option<&str> {
     let stem = zip_path.file_stem()?.to_str()?; // From OsStr → &str
     let base_name = stem.rsplit_once('_').map(|(left, _)| left).unwrap_or(stem);
-    let mut jsonl_name = base_name.to_owned();
+    Some(base_name)
+}
+
+fn write_repo_jsonl(dest_dir: &Path, zip_name: &str, r: &Record) -> Option<()> {
+    let mut jsonl_name = zip_name.to_owned();
     jsonl_name.push_str(".jsonl");
     let jsonl_path = dest_dir.join(jsonl_name);
 
@@ -98,53 +87,88 @@ fn process_valid_file(
     })
 }
 
+fn extract_zip(
+    zip: &mut ZipArchive<BufReader<File>>,
+    name: &str,
+    file_types: &HashMap<String, String>,
+    dest_dir: &Path,
+    tokenizer: &Tokenizer,
+) -> Option<i64> {
+    let mut file_count = 0;
+    for i in 0..zip.len() {
+        let mut file = zip.by_index(i).ok()?;
+        // If we are in a file + it has extension
+        let Some(ext) = parse_ext(&file) else {
+            continue;
+        };
+        if file.is_file()
+                && file.size() <= 2u64.pow(17) // 128KB
+                && file_types.contains_key(&ext)
+                && file_types.get(&ext).unwrap() == "programming"
+        {
+            // Parse file
+            let r = match process_valid_file(&mut file, &tokenizer) {
+                Ok(r) => r,
+                Err(e) => {
+                    continue;
+                }
+            };
+            // Write to JSONL
+            let Some(_) = write_repo_jsonl(&dest_dir, &name, &r) else {
+                continue;
+            };
+            file_count = file_count + 1;
+        }
+    }
+    Some(file_count)
+}
+
 pub fn extract_text(
     zip_paths: Vec<PathBuf>,
     file_types: HashMap<String, String>,
     tokenizer: Tokenizer,
-    workers: usize,
+    _workers: usize,
 ) -> Option<()> {
-    let destination_dir = Path::new("./jsonl/").to_path_buf();
+    let destination_dir = PathBuf::from("./jsonl/");
     fs::create_dir_all(&destination_dir).ok()?;
 
-    let mut file_count = 0;
-    for zip_path in zip_paths {
-        let f = match fs::File::open(&zip_path) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Unable to open zip {}: {}", zip_path.display(), e);
-                continue;
-            }
-        };
-        let reader = BufReader::new(f);
-        let mut zip = zip::ZipArchive::new(reader).ok()?;
+    // Arc types for read-only on async
+    let file_types = Arc::new(file_types);
+    let tokenizer = Arc::new(tokenizer);
+    let dest_dir = Arc::new(destination_dir);
 
-        for i in 0..zip.len() {
-            let mut file = zip.by_index(i).ok()?;
-            // If we are in a file + it has extension
-            let Some(ext) = parse_ext(&file) else {
-                continue;
+    let total_files: i64 = zip_paths
+        .par_iter()
+        .map(|zip_path| {
+            let ft = Arc::new(&file_types);
+            let tok = Arc::new(&tokenizer);
+            let ddir = Arc::clone(&dest_dir);
+
+            let f = match fs::File::open(zip_path) {
+                Ok(f) => f,
+                Err(e) => {
+                    eprintln!("Unable to open zip {}: {}", zip_path.display(), e);
+                    return 0;
+                }
             };
-            if file.is_file()
-                && file.size() <= 2u64.pow(17) // 128KB
-                && file_types.contains_key(&ext)
-                && file_types.get(&ext).unwrap() == "programming"
-            {
-                // Parse file
-                let Ok(r) = process_valid_file(&mut file, &tokenizer) else {
-                    eprintln!("Error on {}", file.name());
-                    continue;
-                };
-                // Write to JSONL
-                let Some(_) = write_repo_jsonl(&destination_dir, &zip_path, &r) else {
-                    continue;
-                };
-                file_count = file_count + 1;
+
+            let Some(zip_name) = get_zip_name(zip_path) else {
+                return 0;
+            };
+
+            let reader = BufReader::new(f);
+            let mut zip = zip::ZipArchive::new(reader).unwrap();
+
+            if let Some(count) = extract_zip(&mut zip, zip_name, &ft, &ddir, &tok) {
+                println!("\t{}:  {}", "Extracted".green(), zip_name);
+                return count;
             }
-        }
-    }
-    println!("Total files processed = {}", file_count);
-    if file_count <= 0 {
+            0
+        })
+        .sum();
+
+    println!("Total files processed = {}", total_files);
+    if total_files <= 0 {
         return None;
     }
     Some(())
