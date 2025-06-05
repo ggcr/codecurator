@@ -106,17 +106,17 @@ fn extract_zip(
                 && file_types.contains_key(&ext)
         {
             // Parse file
-            let r = match process_valid_file(&mut file, &tokenizer) {
+            let r = match process_valid_file(&mut file, tokenizer) {
                 Ok(r) => r,
-                Err(e) => {
+                Err(_) => {
                     continue;
                 }
             };
             // Write to JSONL
-            let Some(_) = write_repo_jsonl(&dest_dir, &name, &r) else {
+            let Some(_) = write_repo_jsonl(dest_dir, name, &r) else {
                 continue;
             };
-            file_count = file_count + 1;
+            file_count += 1;
         }
     }
     Some(file_count)
