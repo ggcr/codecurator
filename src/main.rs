@@ -1,5 +1,6 @@
 mod cli;
 mod downloader;
+mod error;
 mod extractor;
 mod source;
 

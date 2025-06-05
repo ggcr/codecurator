@@ -1,3 +1,9 @@
+use crate::error::ExtractionError;
+
+use colored::Colorize;
+use rayon::prelude::*;
+use serde::Serialize;
+use std::io::BufReader;
 use std::{
     collections::HashMap,
     fs::{self, File, OpenOptions},
@@ -5,11 +11,6 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-
-use colored::Colorize;
-use rayon::prelude::*;
-use serde::Serialize;
-use std::io::BufReader;
 use tokenizers::Tokenizer;
 use uuid::Uuid;
 use zip::ZipArchive;
@@ -39,7 +40,7 @@ fn get_zip_name(zip_path: &Path) -> Option<&str> {
     Some(base_name)
 }
 
-fn write_repo_jsonl(dest_dir: &Path, zip_name: &str, r: &Record) -> Option<()> {
+fn write_repo_jsonl(dest_dir: &Path, zip_name: &str, r: &Record) -> Result<(), ExtractionError> {
     let mut jsonl_name = zip_name.to_owned();
     jsonl_name.push_str(".jsonl");
     let jsonl_path = dest_dir.join(jsonl_name);
@@ -48,12 +49,11 @@ fn write_repo_jsonl(dest_dir: &Path, zip_name: &str, r: &Record) -> Option<()> {
     let file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(&jsonl_path)
-        .ok()?;
+        .open(&jsonl_path)?;
 
     let writer = BufWriter::new(file);
-    jsonl::write(writer, r).ok()?;
-    Some(())
+    jsonl::write(writer, r)?;
+    Ok(())
 }
 
 //
@@ -62,7 +62,7 @@ fn write_repo_jsonl(dest_dir: &Path, zip_name: &str, r: &Record) -> Option<()> {
 fn process_valid_file(
     file: &mut zip::read::ZipFile<'_, BufReader<fs::File>>,
     tokenizer: &Tokenizer,
-) -> anyhow::Result<Record> {
+) -> Result<Record, ExtractionError> {
     // Read file contents
     let mut text = String::new();
     file.read_to_string(&mut text)?;
@@ -74,7 +74,9 @@ fn process_valid_file(
     // Metadata: file_type & tokenize
     let file_type = String::from("programming");
     let Ok(encoding) = tokenizer.encode(text.clone(), false) else {
-        return Err(anyhow::Error::msg("Unable to tokenize"));
+        return Err(ExtractionError::Tokenizer {
+            message: String::from("Unable to tokenize"),
+        });
     };
     let n_tokens = encoding.len();
 
@@ -93,10 +95,10 @@ fn extract_zip(
     file_types: &HashMap<String, String>,
     dest_dir: &Path,
     tokenizer: &Tokenizer,
-) -> Option<i64> {
+) -> Result<i64, ExtractionError> {
     let mut file_count = 0;
     for i in 0..zip.len() {
-        let mut file = zip.by_index(i).ok()?;
+        let mut file = zip.by_index(i)?;
         // If we are in a file + it has extension
         let Some(ext) = parse_ext(&file) else {
             continue;
@@ -113,13 +115,13 @@ fn extract_zip(
                 }
             };
             // Write to JSONL
-            let Some(_) = write_repo_jsonl(dest_dir, name, &r) else {
+            let Ok(_) = write_repo_jsonl(dest_dir, name, &r) else {
                 continue;
             };
             file_count += 1;
         }
     }
-    Some(file_count)
+    Ok(file_count)
 }
 
 pub fn extract_text(
@@ -127,9 +129,9 @@ pub fn extract_text(
     file_types: HashMap<String, String>,
     tokenizer: Tokenizer,
     _workers: usize,
-) -> Option<()> {
+) -> Result<(), ExtractionError> {
     let destination_dir = PathBuf::from("./jsonl/");
-    fs::create_dir_all(&destination_dir).ok()?;
+    fs::create_dir_all(&destination_dir)?;
 
     // Arc types for read-only on async
     let file_types = Arc::new(file_types);
@@ -158,7 +160,7 @@ pub fn extract_text(
             let reader = BufReader::new(f);
             let mut zip = zip::ZipArchive::new(reader).unwrap();
 
-            if let Some(count) = extract_zip(&mut zip, zip_name, &ft, &ddir, &tok) {
+            if let Ok(count) = extract_zip(&mut zip, zip_name, &ft, &ddir, &tok) {
                 println!("\t{}:  {}", "Extracted".green(), zip_name);
                 return count;
             }
@@ -167,8 +169,11 @@ pub fn extract_text(
         .sum();
 
     println!("Total files processed = {}", total_files);
+    // TODO: Make this error if and only if the original length is not 0
     if total_files <= 0 {
-        return None;
+        return Err(ExtractionError::Validation {
+            message: String::from("No repos were extracted."),
+        });
     }
-    Some(())
+    Ok(())
 }

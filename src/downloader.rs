@@ -4,26 +4,11 @@ use std::{
     time::Duration,
 };
 
+use crate::error::DownloadError;
 use bytes::Bytes;
 use colored::Colorize;
 use futures::StreamExt;
-use rayon::iter::IntoParallelIterator;
-use thiserror::Error;
 use tokio::time::sleep;
-
-// To avoid the usage of Box<dyn Error>
-// With this we catch both errors either from reqwest or from fs
-#[derive(Debug, Error)]
-pub enum DownloadError {
-    #[error("Network error {0}")]
-    Http(#[from] reqwest::Error),
-
-    #[error("Filesystem error {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("Validation error: {message}")]
-    Validation { message: String },
-}
 
 async fn download_bytes(client: &reqwest::Client, url: &str) -> Result<Bytes, DownloadError> {
     let resp = client
@@ -72,12 +57,6 @@ async fn download_repo_zip(
     );
 
     let mut filepath = format!("./zip/{}-{}.zip", user, &repo);
-
-    // TODO: Keep this for the extract pipeline
-    // and add the etag and heads for a `refresh` command
-    if tokio::fs::try_exists(&filepath).await.unwrap_or(false) {
-        return Ok(PathBuf::from(&filepath));
-    }
 
     // Fetch the latest commit SHA and check if we have it in local
     if let Some(etag) = get_etag(&client, &url).await {
