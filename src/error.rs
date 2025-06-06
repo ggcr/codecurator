@@ -21,6 +21,9 @@ pub enum ExtractionError {
     #[error("IO error")]
     Io(#[from] std::io::Error),
 
+    #[error("YAML error")]
+    Yaml(#[from] yaml_rust::ScanError),
+
     #[error("JSON lines error")]
     JsonlWriter(#[from] jsonl::WriteError),
 

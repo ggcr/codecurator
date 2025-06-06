@@ -51,7 +51,7 @@ fn write_repo_jsonl(dest_dir: &Path, zip_name: &str, r: &Record) -> Result<(), E
     // To avoid over-writting on the next file of the repo
     let file = OpenOptions::new()
         .create(true)
-        .append(true)
+        .write(true)
         .open(&jsonl_path)?;
 
     let writer = BufWriter::new(file);

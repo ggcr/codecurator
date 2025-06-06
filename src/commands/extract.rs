@@ -1,7 +1,7 @@
 // src/commands/extract.rs
 
-use crate::extractor::extract_text;
 use crate::source::parse_source;
+use crate::{error::ExtractionError, extractor::extract_text};
 use colored::Colorize;
 use std::{
     collections::HashMap,
@@ -12,9 +12,16 @@ use std::{
 use tokenizers::Tokenizer;
 use yaml_rust::YamlLoader;
 
-fn listdir(dir: &Path) -> anyhow::Result<Vec<PathBuf>> {
+fn listdir(dir: &Path) -> Result<Vec<PathBuf>, ExtractionError> {
     let mut files: Vec<PathBuf> = Vec::new();
-    let dir_files = fs::read_dir(dir)?;
+    let dir_files = match fs::read_dir(dir) {
+        Ok(dfs) => dfs,
+        Err(e) => {
+            return Err(ExtractionError::Validation {
+                message: format!("Error while listing dir {}: {}", dir.display(), e),
+            });
+        }
+    };
     for file in dir_files {
         let f = file?.path();
         if f.extension() == Some(OsStr::new("zip")) {
@@ -22,12 +29,14 @@ fn listdir(dir: &Path) -> anyhow::Result<Vec<PathBuf>> {
         }
     }
     if files.is_empty() {
-        return Err(anyhow::Error::msg("Empty directory. Nothing to extract"));
+        return Err(ExtractionError::Validation {
+            message: String::from("Empty ZIP directory. Nothing to extract"),
+        });
     }
     Ok(files)
 }
 
-fn read_linguist(path: &Path) -> anyhow::Result<HashMap<String, String>> {
+fn read_linguist(path: &Path) -> Result<HashMap<String, String>, ExtractionError> {
     let fc = std::fs::read_to_string(path)?;
     let docs = YamlLoader::load_from_str(&fc)?;
     let doc = &docs[0];
@@ -45,7 +54,9 @@ fn read_linguist(path: &Path) -> anyhow::Result<HashMap<String, String>> {
         }
     }
     if ret.is_empty() {
-        return Err(anyhow::Error::msg("Linguist yml is empty"));
+        return Err(ExtractionError::Validation {
+            message: String::from("Linguist yml is empty"),
+        });
     }
     Ok(ret)
 }
@@ -53,7 +64,7 @@ fn read_linguist(path: &Path) -> anyhow::Result<HashMap<String, String>> {
 fn filter_listdir_by_source(
     paths: &Vec<PathBuf>,
     source: &Vec<(String, String)>,
-) -> anyhow::Result<Vec<PathBuf>> {
+) -> Result<Vec<PathBuf>, ExtractionError> {
     let mut filtered = Vec::new();
     // Really slow! Optimize for fast checkup
 
@@ -71,7 +82,9 @@ fn filter_listdir_by_source(
         }
     }
     if filtered.is_empty() {
-        return Err(anyhow::Error::msg("0 Filtered repos"));
+        return Err(ExtractionError::Validation {
+            message: String::from("0 Filtered repos"),
+        });
     }
     Ok(filtered)
 }
