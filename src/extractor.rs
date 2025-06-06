@@ -19,9 +19,12 @@ use zip::ZipArchive;
 struct Record {
     text: String,
     id: String,
-    path: String,
-    file_type: String,
-    n_tokens: usize,
+    file_extension: String,
+    category: String,
+    file_path: String,
+    size_in_bytes: u64,
+    file_name: String,
+    tokens: usize,
 }
 
 fn parse_ext(file: &zip::read::ZipFile<'_, BufReader<fs::File>>) -> Option<String> {
@@ -56,12 +59,21 @@ fn write_repo_jsonl(dest_dir: &Path, zip_name: &str, r: &Record) -> Result<(), E
     Ok(())
 }
 
+fn extract_path_metadata(
+    file: &mut zip::read::ZipFile<'_, BufReader<fs::File>>,
+) -> Option<(String, String)> {
+    let path: PathBuf = file.enclosed_name()?;
+    let filename = path.file_name()?;
+    Some((path.display().to_string(), filename.display().to_string()))
+}
+
 //
 // JSONL format: text, id, path, metadata
 //
 fn process_valid_file(
     file: &mut zip::read::ZipFile<'_, BufReader<fs::File>>,
     tokenizer: &Tokenizer,
+    extension: String,
 ) -> Result<Record, ExtractionError> {
     // Read file contents
     let mut text = String::new();
@@ -69,13 +81,20 @@ fn process_valid_file(
 
     // Secondary fields: id, path
     let id = Uuid::new_v4().to_string();
-    let path: String = file.name().to_string();
+    let Some((file_path, file_name)): Option<(String, String)> = extract_path_metadata(file) else {
+        return Err(ExtractionError::Validation {
+            message: format!(
+                "Cannot safely extract path and filename from {}.",
+                file.name()
+            ),
+        });
+    };
 
     // Metadata: file_type & tokenize
     let file_type = String::from("programming");
     let Ok(encoding) = tokenizer.encode(text.clone(), false) else {
         return Err(ExtractionError::Tokenizer {
-            message: String::from("Unable to tokenize"),
+            message: format!("Unable to tokenize {}", file.name()),
         });
     };
     let n_tokens = encoding.len();
@@ -83,9 +102,12 @@ fn process_valid_file(
     Ok(Record {
         text,
         id,
-        path,
-        file_type,
-        n_tokens,
+        category: file_type,
+        file_path,
+        file_name,
+        file_extension: extension,
+        size_in_bytes: file.size(),
+        tokens: n_tokens,
     })
 }
 
@@ -108,7 +130,7 @@ fn extract_zip(
                 && file_types.contains_key(&ext)
         {
             // Parse file
-            let r = match process_valid_file(&mut file, tokenizer) {
+            let r = match process_valid_file(&mut file, tokenizer, ext) {
                 Ok(r) => r,
                 Err(_) => {
                     continue;
