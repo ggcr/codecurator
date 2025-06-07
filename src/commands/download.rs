@@ -2,13 +2,13 @@
 
 use colored::Colorize;
 
+use crate::config::DownloadConfig;
 use crate::downloader::download_repos;
 use crate::source::parse_source;
-use std::path::PathBuf;
 
-pub async fn run(source: PathBuf, workers: usize) {
+pub async fn run(ctx: &DownloadConfig) {
     // Read source file
-    let uris: Vec<(String, String)> = parse_source(&source);
+    let uris: Vec<(String, String)> = parse_source(&ctx.source);
     if uris.is_empty() {
         eprintln!(
             "{} No valid URIs found in source file",
@@ -17,7 +17,7 @@ pub async fn run(source: PathBuf, workers: usize) {
     }
 
     // Download
-    download_repos(uris, workers)
+    download_repos(uris, &ctx.zip_dir, &ctx.user_agent, ctx.workers)
         .await
         .expect("No content has been downloaded.");
 }

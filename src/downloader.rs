@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{fs, path::PathBuf, time::Duration};
 
 use crate::error::DownloadError;
 use bytes::Bytes;
@@ -82,10 +78,12 @@ async fn download_repo_zip(
 
 pub async fn download_repos(
     uris: Vec<(String, String)>,
+    zip_dir: &PathBuf,
+    _user_agent: &String,
     workers: usize,
 ) -> Result<Vec<PathBuf>, DownloadError> {
     // Download & Write
-    let destination_dir = Path::new("./zip/");
+    let destination_dir = zip_dir;
     fs::create_dir_all(destination_dir)?;
 
     // We try first downloading from main, if err, we try on master

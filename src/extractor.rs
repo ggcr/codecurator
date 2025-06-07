@@ -147,12 +147,12 @@ fn extract_zip(
 }
 
 pub fn extract_text(
+    jsonl_dir: &PathBuf,
     zip_paths: Vec<PathBuf>,
     file_types: HashMap<String, String>,
     tokenizer: Tokenizer,
-    _workers: usize,
 ) -> Result<(), ExtractionError> {
-    let destination_dir = PathBuf::from("./jsonl/");
+    let destination_dir = jsonl_dir;
     fs::create_dir_all(&destination_dir)?;
 
     // Arc types for read-only on async

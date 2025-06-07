@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 
@@ -17,6 +18,17 @@ pub fn parse_source(source: &PathBuf) -> Vec<(String, String)> {
     for line in serde_json::Deserializer::from_str(&input).into_iter::<&str>() {
         if let Some((user, repo)) = parse_line(line) {
             valid_repos.push((user.to_owned(), repo.to_owned()));
+        }
+    }
+    valid_repos
+}
+
+pub fn parse_source_as_hashset(source: &PathBuf) -> HashSet<String> {
+    let input = fs::read_to_string(source).expect("Cannot read source");
+    let mut valid_repos: HashSet<String> = HashSet::new();
+    for line in serde_json::Deserializer::from_str(&input).into_iter::<&str>() {
+        if let Some((user, repo)) = parse_line(line) {
+            valid_repos.insert(format!("{}-{}", user, repo));
         }
     }
     valid_repos

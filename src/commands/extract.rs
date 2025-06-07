@@ -1,8 +1,10 @@
 // src/commands/extract.rs
 
-use crate::source::parse_source;
+use crate::config::ExtractionConfig;
+use crate::source::parse_source_as_hashset;
 use crate::{error::ExtractionError, extractor::extract_text};
 use colored::Colorize;
+use std::collections::HashSet;
 use std::{
     collections::HashMap,
     ffi::OsStr,
@@ -63,20 +65,18 @@ fn read_linguist(path: &Path) -> Result<HashMap<String, String>, ExtractionError
 
 fn filter_listdir_by_source(
     paths: &Vec<PathBuf>,
-    source: &Vec<(String, String)>,
+    source_hs: &HashSet<String>,
 ) -> Result<Vec<PathBuf>, ExtractionError> {
     let mut filtered = Vec::new();
-    // Really slow! Optimize for fast checkup
+
+    // We compare the provided source file with the local zips in disk
 
     for path in paths {
         if let Some(stem_os) = path.file_stem() {
             if let Some(stem) = stem_os.to_str() {
-                for (user, repo) in source {
-                    let prefix = format!("{}-{}", user, repo);
-                    if stem.starts_with(&prefix) {
-                        filtered.push(path.clone());
-                        break;
-                    }
+                let prefix = stem.split("_").next().unwrap_or(stem);
+                if source_hs.contains(prefix) {
+                    filtered.push(path.clone());
                 }
             }
         }
@@ -89,9 +89,9 @@ fn filter_listdir_by_source(
     Ok(filtered)
 }
 
-pub async fn run(source: PathBuf, workers: usize) {
+pub async fn run(ctx: &ExtractionConfig) {
     // List zip dir
-    let paths = match listdir(Path::new("./zip")) {
+    let paths = match listdir(&ctx.zip_dir) {
         Ok(paths) => paths,
         Err(e) => {
             eprintln!("{} {}", "[WARNING]".truecolor(214, 143, 0), e);
@@ -100,8 +100,8 @@ pub async fn run(source: PathBuf, workers: usize) {
     };
 
     // Filter zip files for those ennumerated in source file
-    let repos = parse_source(&source);
-    let paths = match filter_listdir_by_source(&paths, &repos) {
+    let repos_hs = parse_source_as_hashset(&ctx.source);
+    let paths = match filter_listdir_by_source(&paths, &repos_hs) {
         Ok(paths) => paths,
         Err(e) => {
             eprintln!("{} {}", "[WARNING]".truecolor(214, 143, 0), e);
@@ -112,9 +112,9 @@ pub async fn run(source: PathBuf, workers: usize) {
     // Load tokenizer and linguist yaml
     let gpt2tokenizer = Tokenizer::from_pretrained("openai-community/gpt2", None)
         .expect("Failed to load the tokenizer");
-    let linguist_file_types = read_linguist(Path::new("vendor/languages.yml"))
-        .expect("Unable to read linguist languages yaml");
+    let linguist_file_types =
+        read_linguist(&ctx.linguist_path).expect("Unable to read linguist languages yaml");
 
     // Extract
-    let _ = extract_text(paths, linguist_file_types, gpt2tokenizer, workers);
+    let _ = extract_text(&ctx.jsonl_dir, paths, linguist_file_types, gpt2tokenizer);
 }
