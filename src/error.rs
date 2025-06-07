@@ -18,13 +18,13 @@ pub enum DownloadError {
 
 #[derive(Debug, Error)]
 pub enum ExtractionError {
-    #[error("IO error")]
+    #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("YAML error")]
+    #[error("YAML error: {0}")]
     Yaml(#[from] yaml_rust::ScanError),
 
-    #[error("JSON lines error")]
+    #[error("JSON lines error: {0}")]
     JsonlWriter(#[from] jsonl::WriteError),
 
     #[error("Tokenizer error")]
@@ -35,4 +35,13 @@ pub enum ExtractionError {
 
     #[error("Validation error: {message}")]
     Validation { message: String },
+}
+
+#[derive(Debug, Error)]
+pub enum ExactDedupError {
+    #[error("Filesystem error {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("JSON lines error: {0}")]
+    JsonlReader(#[from] jsonl::ReadError),
 }

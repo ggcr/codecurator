@@ -14,7 +14,7 @@ use std::{
 use tokenizers::Tokenizer;
 use yaml_rust::YamlLoader;
 
-fn listdir(dir: &Path) -> Result<Vec<PathBuf>, ExtractionError> {
+pub fn listdir(dir: &Path, match_extension: String) -> Result<Vec<PathBuf>, ExtractionError> {
     let mut files: Vec<PathBuf> = Vec::new();
     let dir_files = match fs::read_dir(dir) {
         Ok(dfs) => dfs,
@@ -26,13 +26,13 @@ fn listdir(dir: &Path) -> Result<Vec<PathBuf>, ExtractionError> {
     };
     for file in dir_files {
         let f = file?.path();
-        if f.extension() == Some(OsStr::new("zip")) {
+        if f.extension() == Some(OsStr::new(&match_extension)) {
             files.push(f.clone());
         }
     }
     if files.is_empty() {
         return Err(ExtractionError::Validation {
-            message: String::from("Empty ZIP directory. Nothing to extract"),
+            message: String::from("Empty directory"),
         });
     }
     Ok(files)
@@ -91,7 +91,7 @@ fn filter_listdir_by_source(
 
 pub async fn run(ctx: &ExtractionConfig) {
     // List zip dir
-    let paths = match listdir(&ctx.zip_dir) {
+    let paths = match listdir(&ctx.zip_dir, "zip".to_string()) {
         Ok(paths) => paths,
         Err(e) => {
             eprintln!("{} {}", "[WARNING]".truecolor(214, 143, 0), e);

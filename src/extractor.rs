@@ -2,7 +2,7 @@ use crate::error::ExtractionError;
 
 use colored::Colorize;
 use rayon::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::io::BufReader;
 use std::{
     collections::HashMap,
@@ -15,13 +15,13 @@ use tokenizers::Tokenizer;
 use uuid::Uuid;
 use zip::ZipArchive;
 
-#[derive(Serialize)]
-struct Record {
-    text: String,
-    id: String,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Record {
+    pub text: String,
+    pub id: String,
     file_extension: String,
     category: String,
-    file_path: String,
+    pub file_path: String,
     size_in_bytes: u64,
     file_name: String,
     tokens: usize,
@@ -43,15 +43,21 @@ fn get_zip_name(zip_path: &Path) -> Option<&str> {
     Some(base_name)
 }
 
-fn write_repo_jsonl(dest_dir: &Path, zip_name: &str, r: &Record) -> Result<(), ExtractionError> {
+fn write_repo_jsonl(
+    dest_dir: &Path,
+    zip_name: &str,
+    r: &Record,
+    fc: &i64,
+) -> Result<(), ExtractionError> {
     let mut jsonl_name = zip_name.to_owned();
     jsonl_name.push_str(".jsonl");
     let jsonl_path = dest_dir.join(jsonl_name);
 
-    // To avoid over-writting on the next file of the repo
     let file = OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(*fc == 0)
+        .append(*fc != 0)
         .open(&jsonl_path)?;
 
     let writer = BufWriter::new(file);
@@ -137,7 +143,7 @@ fn extract_zip(
                 }
             };
             // Write to JSONL
-            let Ok(_) = write_repo_jsonl(dest_dir, name, &r) else {
+            let Ok(_) = write_repo_jsonl(dest_dir, name, &r, &file_count) else {
                 continue;
             };
             file_count += 1;

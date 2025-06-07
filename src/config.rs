@@ -19,6 +19,12 @@ pub struct ExtractionConfig {
     pub max_file_size: u64,
 }
 
+#[derive(Debug, Clone)]
+pub struct DedupeConfig {
+    pub source: PathBuf,
+    pub jsonl_dir: PathBuf,
+}
+
 impl Default for DownloadConfig {
     fn default() -> Self {
         Self {
@@ -90,6 +96,28 @@ impl ExtractionConfig {
             }
             if let Some(m) = max_file_size {
                 config.max_file_size = m.to_owned();
+            }
+        }
+        config
+    }
+}
+
+impl Default for DedupeConfig {
+    fn default() -> Self {
+        Self {
+            source: PathBuf::from("./config/example.jsonl"),
+            jsonl_dir: PathBuf::from("./jsonl"),
+        }
+    }
+}
+
+impl DedupeConfig {
+    pub fn from_cli(opts_cmd: &cli::Command) -> DedupeConfig {
+        let mut config = DedupeConfig::default();
+        if let cli::Command::Dedupe { source, jsonl_dir } = opts_cmd {
+            config.source = source.to_owned();
+            if let Some(j) = jsonl_dir {
+                config.jsonl_dir = j.to_owned();
             }
         }
         config

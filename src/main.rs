@@ -1,18 +1,19 @@
 mod cli;
 mod config;
+mod deduplication;
 mod downloader;
 mod error;
 mod extractor;
 mod source;
 
 mod commands {
+    pub mod dedupe;
     pub mod download;
     pub mod extract;
-    // pub mod refresh;
 }
 
 use cli::{Command, Opt};
-use config::{DownloadConfig, ExtractionConfig};
+use config::{DedupeConfig, DownloadConfig, ExtractionConfig};
 use structopt::StructOpt;
 
 #[tokio::main]
@@ -27,6 +28,10 @@ async fn main() {
         Command::Extract { .. } => {
             let config = ExtractionConfig::from_cli(&opts.cmd);
             commands::extract::run(&config).await;
+        }
+        Command::Dedupe { .. } => {
+            let config = DedupeConfig::from_cli(&opts.cmd);
+            commands::dedupe::run(&config).await;
         }
     }
 }

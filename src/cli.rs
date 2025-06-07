@@ -33,6 +33,13 @@ pub enum Command {
         #[structopt(long)]
         max_file_size: Option<u64>,
     },
+    Dedupe {
+        #[structopt(parse(from_os_str))]
+        source: PathBuf,
+
+        #[structopt(parse(from_os_str))]
+        jsonl_dir: Option<PathBuf>,
+    },
 }
 
 // CLI Args
