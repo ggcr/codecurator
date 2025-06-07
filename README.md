@@ -1,12 +1,13 @@
 # CodeCurator
 
-An end-to-end tool for curating and processing GitHub repos as datasets
+An end-to-end tool for curating GitHub repositories into structured code datasets.
 
-- Fast and parallel download and processing
-- Filters out non-code files
-- GPT2 BPE tokenization
+- **Fast parallel processing** - Download and extract with configurable workers
+- **Smart filtering** - Only processes programming files using GitHub Linguist
+- **GPT-2 tokenization** - Ready-to-use token counts for ML workflows
+- **Efficient caching** - Uses ETags to avoid re-downloading unchanged repos
 
-Use it to curate training data at scale, run static analytics, or archive code snapshots.
+Perfect for curating training data, running code analysis, or creating repository archives.
 
 
 ### Installation
@@ -17,7 +18,8 @@ cargo install --path .
 
 ### Usage
 
-Example input file (each line contains a GitHub repository):
+Create an input file with one GitHub repository per line:
+
 ```jsonl
 "microsoft/vscode"
 "vercel/next.js"
@@ -31,14 +33,72 @@ Example input file (each line contains a GitHub repository):
 "elastic/elasticsearch"
 ```
 
-Download the repos:
+**Download repositories:**
 ```bash
 codecurator download ./configs/repos.jsonl
 ```
-This creates a folder containing all of the repository ZIP files (`/zip/<repo>.zip`). By default, it attempts to download from `main` branch, if that fails, it falls back to `master`.
 
-Extract them onto JSON Lines files:
+This creates ZIP files in `/zip/` directory. Downloads from `main` branch first, falls back to `master` if needed.
+
+**Extract and process:**
 ```bash
 codecurator extract ./configs/repos.jsonl
 ```
-Parses all the valid coding files, tokenizes content and dumps it into a `jsonl` file (`/jsonl/<repo>.jsonl`).
+
+Processes all programming files, tokenizes content, and outputs structured data to `/jsonl/` directory.
+
+### CLI Reference
+
+```
+$ codecurator --help
+
+USAGE:
+    codecurator <SUBCOMMAND>
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+SUBCOMMANDS:
+    download
+    extract
+```
+
+```
+$ codecurator download --help
+
+USAGE:
+    codecurator download [OPTIONS] <source> [zip-dir]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+    -u, --user-agent <user-agent>
+    -w, --workers <workers>
+
+ARGS:
+    <source>
+    <zip-dir>
+```
+
+```
+$ codecurator extract --help
+
+USAGE:
+    codecurator extract [OPTIONS] <source> [ARGS]
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+    --max-file-size <max-file-size>
+
+ARGS:
+    <source>
+    <zip-dir>
+    <jsonl-dir>
+    <linguist-path>
+```
