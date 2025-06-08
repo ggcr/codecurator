@@ -47,3 +47,9 @@ codecurator extract ./configs/repos.jsonl
 
 Processes all programming files, tokenizes content, and outputs structured data to `/jsonl/` directory.
 
+**Deduplication:**
+```bash
+codecurator dedupe ./configs/repos.jsonl
+```
+Hashes the contents of all files and deduplicates them. Stores the final data to `/dedup/` by default.
+

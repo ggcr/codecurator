@@ -1,4 +1,8 @@
+use std::collections::HashSet;
+use std::ffi::OsString;
+use std::fs;
 use std::io::Cursor;
+use std::path::{Component, Path};
 use std::{fs::File, io::BufReader, path::PathBuf};
 
 use polars::prelude::*;
@@ -6,7 +10,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::Serialize;
 
 use crate::error::ExactDedupError;
-use crate::extractor::Record;
+use crate::extractor::{Record, write_repo_jsonl};
 
 #[derive(Serialize)]
 struct DedupRecord {
@@ -75,7 +79,47 @@ fn read_records(jsonl_path: &PathBuf) -> Result<Vec<Record>, ExactDedupError> {
     Ok(records)
 }
 
-pub fn exact_deduplication(jsonl_paths: Vec<PathBuf>) {
+fn write_records(
+    jsonl_path: &PathBuf,
+    ids: &HashSet<String>,
+    dest_dir: &Path,
+) -> Result<(), ExactDedupError> {
+    let file = File::open(jsonl_path)?;
+    let mut reader = BufReader::new(file);
+
+    // Replace the root dir from /jsonl/ to /<dedup dir>/
+    let name = match jsonl_path.file_stem() {
+        Some(name) => format!("{}", name.display()),
+        _ => {
+            return Err(ExactDedupError::Validation {
+                message: format!(
+                    "Unable to parse filename of jsonl path {}",
+                    jsonl_path.display()
+                ),
+            });
+        }
+    };
+
+    let mut fc = 0;
+    loop {
+        match jsonl::read::<_, Record>(&mut reader) {
+            Ok(record) => {
+                if ids.contains(&record.id) {
+                    let _ = write_repo_jsonl(dest_dir, &name, &record, &fc);
+                }
+            }
+            Err(jsonl::ReadError::Eof) => break,
+            Err(_) => continue,
+        }
+        fc += 1;
+    }
+    Ok(())
+}
+
+pub fn exact_deduplication(jsonl_paths: Vec<PathBuf>, ddest: &Path) {
+    let destination_dir = ddest;
+    fs::create_dir_all(&destination_dir).expect("Unable to create deduplication dir");
+
     println!(
         "Starting Exact deduplication on {} repos",
         jsonl_paths.len()
@@ -91,6 +135,13 @@ pub fn exact_deduplication(jsonl_paths: Vec<PathBuf>) {
     println!("Computed {} MD5 hashes", hashes.len());
 
     let ids: Vec<String> = hashes.get_unique_ids().unwrap();
+    let ids_hs: HashSet<String> = HashSet::from_iter(ids.iter().cloned());
 
     println!("Found {} unique MD5 hashes", ids.len());
+
+    let _ = jsonl_paths
+        .par_iter()
+        .filter_map(|path| write_records(path, &ids_hs, destination_dir).ok());
+
+    println!("Exact dedup written to {}", destination_dir.display());
 }

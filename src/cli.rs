@@ -39,6 +39,9 @@ pub enum Command {
 
         #[structopt(parse(from_os_str))]
         jsonl_dir: Option<PathBuf>,
+
+        #[structopt(parse(from_os_str))]
+        dest_dir: Option<PathBuf>,
     },
 }
 

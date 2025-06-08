@@ -3,7 +3,10 @@
 use crate::commands::extract::listdir;
 use crate::config::DedupeConfig;
 use crate::deduplication::exact_deduplication;
+use crate::source::parse_source_as_hashset;
 use colored::Colorize;
+
+use super::extract::filter_listdir_by_source;
 
 pub async fn run(ctx: &DedupeConfig) {
     // List zip dir
@@ -15,6 +18,16 @@ pub async fn run(ctx: &DedupeConfig) {
         }
     };
 
+    // Filter zip files for those ennumerated in source file
+    let repos_hs = parse_source_as_hashset(&ctx.source);
+    let paths = match filter_listdir_by_source(&paths, &repos_hs) {
+        Ok(paths) => paths,
+        Err(e) => {
+            eprintln!("{} {}", "[WARNING]".truecolor(214, 143, 0), e);
+            return;
+        }
+    };
+
     // Compute hashes per each document
-    let ed_records = exact_deduplication(paths);
+    let _ = exact_deduplication(paths, &ctx.dest_dir);
 }

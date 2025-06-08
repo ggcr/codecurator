@@ -50,4 +50,7 @@ pub enum ExactDedupError {
 
     #[error("Unable to build DataFrame: {0}")]
     Polars(#[from] polars::prelude::PolarsError),
+
+    #[error("Validation error: {message}")]
+    Validation { message: String },
 }

@@ -23,6 +23,7 @@ pub struct ExtractionConfig {
 pub struct DedupeConfig {
     pub source: PathBuf,
     pub jsonl_dir: PathBuf,
+    pub dest_dir: PathBuf,
 }
 
 impl Default for DownloadConfig {
@@ -107,6 +108,7 @@ impl Default for DedupeConfig {
         Self {
             source: PathBuf::from("./config/example.jsonl"),
             jsonl_dir: PathBuf::from("./jsonl"),
+            dest_dir: PathBuf::from("./dedup"),
         }
     }
 }
@@ -114,10 +116,18 @@ impl Default for DedupeConfig {
 impl DedupeConfig {
     pub fn from_cli(opts_cmd: &cli::Command) -> DedupeConfig {
         let mut config = DedupeConfig::default();
-        if let cli::Command::Dedupe { source, jsonl_dir } = opts_cmd {
+        if let cli::Command::Dedupe {
+            source,
+            jsonl_dir,
+            dest_dir,
+        } = opts_cmd
+        {
             config.source = source.to_owned();
             if let Some(j) = jsonl_dir {
                 config.jsonl_dir = j.to_owned();
+            }
+            if let Some(d) = dest_dir {
+                config.dest_dir = d.to_owned();
             }
         }
         config

@@ -63,7 +63,7 @@ fn read_linguist(path: &Path) -> Result<HashMap<String, String>, ExtractionError
     Ok(ret)
 }
 
-fn filter_listdir_by_source(
+pub fn filter_listdir_by_source(
     paths: &Vec<PathBuf>,
     source_hs: &HashSet<String>,
 ) -> Result<Vec<PathBuf>, ExtractionError> {

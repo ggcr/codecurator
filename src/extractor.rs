@@ -43,13 +43,13 @@ fn get_zip_name(zip_path: &Path) -> Option<&str> {
     Some(base_name)
 }
 
-fn write_repo_jsonl(
+pub fn write_repo_jsonl(
     dest_dir: &Path,
-    zip_name: &str,
+    file_name: &str,
     r: &Record,
     fc: &i64,
 ) -> Result<(), ExtractionError> {
-    let mut jsonl_name = zip_name.to_owned();
+    let mut jsonl_name = file_name.to_owned();
     jsonl_name.push_str(".jsonl");
     let jsonl_path = dest_dir.join(jsonl_name);
 
@@ -84,6 +84,7 @@ fn process_valid_file(
     // Read file contents
     let mut text = String::new();
     file.read_to_string(&mut text)?;
+    let text = text.trim().to_string();
 
     // Secondary fields: id, path
     let id = Uuid::new_v4().to_string();
