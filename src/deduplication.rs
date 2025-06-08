@@ -1,13 +1,14 @@
-use std::io::BufRead;
+use std::io::Cursor;
 use std::{fs::File, io::BufReader, path::PathBuf};
 
-use colored::Colorize;
-use itertools::Dedup;
+use polars::prelude::*;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use serde::Serialize;
 
 use crate::error::ExactDedupError;
 use crate::extractor::Record;
 
+#[derive(Serialize)]
 struct DedupRecord {
     id: String,
     md5: String,
@@ -20,6 +21,40 @@ impl From<Record> for DedupRecord {
             id: doc.id,
             md5: format!("{:?}", digest),
         }
+    }
+}
+
+// Trait to convert to Polars DataFrame and back
+trait DedupDataFrame {
+    fn to_dataframe(&self) -> Result<DataFrame, ExactDedupError>;
+    fn get_unique_md5(&self) -> Result<DataFrame, ExactDedupError>;
+    fn get_unique_ids(&self) -> Result<Vec<String>, ExactDedupError>;
+}
+
+impl DedupDataFrame for Vec<DedupRecord> {
+    fn to_dataframe(&self) -> Result<DataFrame, ExactDedupError> {
+        let json = serde_json::to_string(&self)?;
+        let cursor = Cursor::new(json);
+        let df = JsonReader::new(cursor).finish()?;
+        Ok(df)
+    }
+
+    fn get_unique_md5(&self) -> Result<DataFrame, ExactDedupError> {
+        let df = self.to_dataframe()?;
+        let df_unique =
+            df.unique_stable(Some(&["md5".to_string()]), UniqueKeepStrategy::Any, None)?;
+        Ok(df_unique)
+    }
+    fn get_unique_ids(&self) -> Result<Vec<String>, ExactDedupError> {
+        let df = self.get_unique_md5()?;
+        let ids: Vec<String> = df
+            .column("id")?
+            .str()?
+            .into_iter()
+            .flatten()
+            .map(|r| r.to_string())
+            .collect();
+        Ok(ids)
     }
 }
 
@@ -52,5 +87,9 @@ pub fn exact_deduplication(jsonl_paths: Vec<PathBuf>) {
         .map(DedupRecord::from)
         .collect();
 
-    println!("Computed MD5 hashes on {} files", hashes.len());
+    println!("Computed {} MD5 hashes", hashes.len());
+
+    let ids: Vec<String> = hashes.get_unique_ids().unwrap();
+
+    println!("Found {} unique MD5 hashes", ids.len());
 }

@@ -44,4 +44,10 @@ pub enum ExactDedupError {
 
     #[error("JSON lines error: {0}")]
     JsonlReader(#[from] jsonl::ReadError),
+
+    #[error("Unable to convert hashes to DataFrame: {0}")]
+    SerdeJson(#[from] serde_json::Error),
+
+    #[error("Unable to build DataFrame: {0}")]
+    Polars(#[from] polars::prelude::PolarsError),
 }
