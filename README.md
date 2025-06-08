@@ -42,7 +42,7 @@ This creates ZIP files in `/zip/` directory. Downloads from `main` branch first,
 
 **Extract and process:**
 ```bash
-codecurator extract ./configs/repos.jsonl
+codecurator extract ./configs/repos.jsonl --languages Python Rust Verilog
 ```
 
 Processes all programming files, tokenizes content, and outputs structured data to `/jsonl/` directory.
