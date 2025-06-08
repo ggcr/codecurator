@@ -53,3 +53,11 @@ codecurator dedupe ./configs/repos.jsonl
 ```
 Hashes the contents of all files and deduplicates them. Stores the final data to `/dedup/` by default.
 
+**Statistics:**
+```bash
+$ bash stats/count_records.sh ./jsonl/
+Total records: 110645
+
+$ bash stats/count_tokens.sh ./dedup/
+Total tokens: 346574283
+```
