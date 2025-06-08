@@ -45,6 +45,7 @@ impl DedupDataFrame for Vec<DedupRecord> {
             df.unique_stable(Some(&["md5".to_string()]), UniqueKeepStrategy::Any, None)?;
         Ok(df_unique)
     }
+
     fn get_unique_ids(&self) -> Result<Vec<String>, ExactDedupError> {
         let df = self.get_unique_md5()?;
         let ids: Vec<String> = df
