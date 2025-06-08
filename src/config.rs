@@ -17,12 +17,14 @@ pub struct ExtractionConfig {
     pub jsonl_dir: PathBuf,
     pub linguist_path: PathBuf,
     pub max_file_size: u64,
+    pub languages: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct DedupeConfig {
     pub source: PathBuf,
     pub jsonl_dir: PathBuf,
+    pub exact_dedup_dir: PathBuf,
     pub dest_dir: PathBuf,
 }
 
@@ -65,11 +67,12 @@ impl DownloadConfig {
 impl Default for ExtractionConfig {
     fn default() -> Self {
         Self {
-            source: PathBuf::from("./config/example.jsonl"),
+            source: PathBuf::from("./config/repos.jsonl"),
             zip_dir: PathBuf::from("./zip"),
             jsonl_dir: PathBuf::from("./jsonl"),
             linguist_path: PathBuf::from("./vendor/languages.yml"),
             max_file_size: 2u64.pow(17), // 128KB
+            languages: None,             // None, Empty, will grab all files
         }
     }
 }
@@ -83,6 +86,7 @@ impl ExtractionConfig {
             jsonl_dir,
             linguist_path,
             max_file_size,
+            languages,
         } = opts_cmd
         {
             config.source = source.to_owned();
@@ -98,6 +102,7 @@ impl ExtractionConfig {
             if let Some(m) = max_file_size {
                 config.max_file_size = m.to_owned();
             }
+            config.languages = languages.to_owned();
         }
         config
     }
@@ -108,6 +113,7 @@ impl Default for DedupeConfig {
         Self {
             source: PathBuf::from("./config/example.jsonl"),
             jsonl_dir: PathBuf::from("./jsonl"),
+            exact_dedup_dir: PathBuf::from("./exact"),
             dest_dir: PathBuf::from("./dedup"),
         }
     }
@@ -119,12 +125,16 @@ impl DedupeConfig {
         if let cli::Command::Dedupe {
             source,
             jsonl_dir,
+            exact_dedup_dir,
             dest_dir,
         } = opts_cmd
         {
             config.source = source.to_owned();
             if let Some(j) = jsonl_dir {
                 config.jsonl_dir = j.to_owned();
+            }
+            if let Some(d) = exact_dedup_dir {
+                config.dest_dir = d.to_owned();
             }
             if let Some(d) = dest_dir {
                 config.dest_dir = d.to_owned();

@@ -12,7 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use tokenizers::Tokenizer;
-use yaml_rust::YamlLoader;
+use yaml_rust::{Yaml, YamlLoader};
 
 pub fn listdir(dir: &Path, match_extension: String) -> Result<Vec<PathBuf>, ExtractionError> {
     let mut files: Vec<PathBuf> = Vec::new();
@@ -38,10 +38,14 @@ pub fn listdir(dir: &Path, match_extension: String) -> Result<Vec<PathBuf>, Extr
     Ok(files)
 }
 
-fn read_linguist(path: &Path) -> Result<HashMap<String, String>, ExtractionError> {
+fn read_linguist(path: &Path) -> Result<Yaml, ExtractionError> {
     let fc = std::fs::read_to_string(path)?;
     let docs = YamlLoader::load_from_str(&fc)?;
     let doc = &docs[0];
+    Ok(doc.clone())
+}
+
+fn get_ext_ft(doc: &Yaml) -> Result<HashMap<String, String>, ExtractionError> {
     let mut ret: HashMap<String, String> = HashMap::new();
     for (_, v) in doc.as_hash().unwrap() {
         let Some(file_type) = v["type"].as_str() else {
@@ -61,6 +65,36 @@ fn read_linguist(path: &Path) -> Result<HashMap<String, String>, ExtractionError
         });
     }
     Ok(ret)
+}
+
+fn get_ext_pl(
+    yaml_doc: &Yaml,
+    langs: &[String],
+) -> Result<HashMap<String, String>, ExtractionError> {
+    let doc = yaml_doc.as_hash().unwrap();
+    let mut union_exts: HashMap<String, String> = HashMap::new();
+    for lang in langs {
+        let lang_key = Yaml::from_str(lang);
+        if let Some(v) = doc.get(&lang_key) {
+            if let Some(file_type) = v["type"].as_str() {
+                if let Some(ext_list) = v["extensions"].as_vec() {
+                    for ext in ext_list {
+                        union_exts.insert(ext.clone().into_string().unwrap(), file_type.to_owned());
+                    }
+                };
+            };
+        } else {
+            eprintln!(
+                "{} Language {} is not defined in linguist",
+                "[WARNING]".truecolor(214, 143, 0),
+                lang
+            );
+        }
+    }
+    if union_exts.is_empty() {
+        return get_ext_ft(yaml_doc);
+    }
+    Ok(union_exts)
 }
 
 pub fn filter_listdir_by_source(
@@ -112,9 +146,16 @@ pub async fn run(ctx: &ExtractionConfig) {
     // Load tokenizer and linguist yaml
     let gpt2tokenizer = Tokenizer::from_pretrained("openai-community/gpt2", None)
         .expect("Failed to load the tokenizer");
-    let linguist_file_types =
+    let linguist_file =
         read_linguist(&ctx.linguist_path).expect("Unable to read linguist languages yaml");
 
+    let ext_file_types = match &ctx.languages {
+        Some(langs) => get_ext_pl(&linguist_file, langs)
+            .expect("Unable to get programming file types extensions from yaml"),
+        None => get_ext_ft(&linguist_file)
+            .expect("Unable to get programming file types extensions from yaml"),
+    };
+
     // Extract
-    let _ = extract_text(&ctx.jsonl_dir, paths, linguist_file_types, gpt2tokenizer);
+    let _ = extract_text(&ctx.jsonl_dir, paths, ext_file_types, gpt2tokenizer);
 }

@@ -32,6 +32,9 @@ pub enum Command {
 
         #[structopt(long)]
         max_file_size: Option<u64>,
+
+        #[structopt(short, long)]
+        languages: Option<Vec<String>>,
     },
     Dedupe {
         #[structopt(parse(from_os_str))]
@@ -39,6 +42,9 @@ pub enum Command {
 
         #[structopt(parse(from_os_str))]
         jsonl_dir: Option<PathBuf>,
+
+        #[structopt(parse(from_os_str))]
+        exact_dedup_dir: Option<PathBuf>,
 
         #[structopt(parse(from_os_str))]
         dest_dir: Option<PathBuf>,
