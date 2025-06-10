@@ -3,7 +3,7 @@ use crate::error::ExtractionError;
 use colored::Colorize;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::io::BufReader;
+use std::io::{BufReader, Write};
 use std::{
     collections::HashMap,
     fs::{self, File, OpenOptions},
@@ -60,8 +60,9 @@ pub fn write_repo_jsonl(
         .append(*fc != 0)
         .open(&jsonl_path)?;
 
-    let writer = BufWriter::new(file);
-    jsonl::write(writer, r)?;
+    let mut writer = BufWriter::new(file);
+    jsonl::write(&mut writer, r)?;
+    writer.flush()?;
     Ok(())
 }
 
