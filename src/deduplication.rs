@@ -125,7 +125,6 @@ fn write_records(
 
 pub fn exact_deduplication(jsonl_paths: &Vec<PathBuf>, ddest: &Path) {
     let destination_dir = ddest;
-    fs::remove_dir_all(&destination_dir).ok();
     fs::create_dir_all(&destination_dir).expect("Unable to create deduplication dir");
 
     println!(
