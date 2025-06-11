@@ -124,9 +124,6 @@ fn write_records(
 }
 
 pub fn exact_deduplication(jsonl_paths: &Vec<PathBuf>, ddest: &Path) {
-    let destination_dir = ddest;
-    fs::create_dir_all(&destination_dir).expect("Unable to create deduplication dir");
-
     println!(
         "Starting Exact deduplication on {} files",
         jsonl_paths.len()
@@ -146,6 +143,9 @@ pub fn exact_deduplication(jsonl_paths: &Vec<PathBuf>, ddest: &Path) {
 
     println!("Found {} unique documents", ids.len());
 
+    let destination_dir = ddest;
+    fs::create_dir_all(&destination_dir).expect("Unable to create deduplication dir");
+
     jsonl_paths
         .par_iter()
         .for_each(|path| match write_records(path, &ids_hs, destination_dir) {
@@ -159,9 +159,6 @@ pub fn exact_deduplication(jsonl_paths: &Vec<PathBuf>, ddest: &Path) {
 }
 
 pub fn fuzzy_deduplication(jsonl_paths: &Vec<PathBuf>, ddest: &Path) {
-    let destination_dir = ddest;
-    fs::create_dir_all(&destination_dir).expect("Unable to create deduplication dir");
-
     println!(
         "Starting Fuzzy deduplication on {} files",
         jsonl_paths.len()
@@ -174,4 +171,7 @@ pub fn fuzzy_deduplication(jsonl_paths: &Vec<PathBuf>, ddest: &Path) {
         .collect();
 
     println!("Loaded {} documents", records.len());
+
+    let destination_dir = ddest;
+    fs::create_dir_all(&destination_dir).expect("Unable to create deduplication dir");
 }

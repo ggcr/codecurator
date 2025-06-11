@@ -8,10 +8,12 @@ fi
 
 DIR="$1"
 total=0
+N=0
 for file in "$DIR"/*.jsonl; do
     char_count=$(jq -s '[.[] | .text] | length' "$file")
     total=$((total + char_count))
+    N=$((N+1))
 done
 
-echo "Total chars: $total"
+echo "Average chars: $((total / N))"
 
