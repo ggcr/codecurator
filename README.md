@@ -1,4 +1,5 @@
 # CodeCurator
+![](https://changkun.de/urlstat?mode=github&repo=changkun/urlstat)
 
 An end-to-end tool for curating GitHub repositories into structured code datasets.
 
