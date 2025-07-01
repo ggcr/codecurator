@@ -6,12 +6,7 @@ mod error;
 mod extractor;
 mod source;
 
-mod commands {
-    pub mod dedupe;
-    pub mod download;
-    pub mod extract;
-}
-
+pub mod commands;
 use cli::{Command, Opt};
 use config::{DedupeConfig, DownloadConfig, ExtractionConfig};
 use structopt::StructOpt;
@@ -23,15 +18,15 @@ async fn main() {
     match opts.cmd {
         Command::Download { .. } => {
             let config = DownloadConfig::from_cli(&opts.cmd);
-            commands::download::run(&config).await;
+            commands::download(&config).await;
         }
         Command::Extract { .. } => {
             let config = ExtractionConfig::from_cli(&opts.cmd);
-            commands::extract::run(&config).await;
+            commands::extract(&config).await;
         }
         Command::Dedupe { .. } => {
             let config = DedupeConfig::from_cli(&opts.cmd);
-            commands::dedupe::run(&config).await;
+            commands::dedupe(&config).await;
         }
     }
 }

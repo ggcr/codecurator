@@ -1,18 +1,18 @@
-// src/commands/extract.rs
+use std::collections::{HashMap, HashSet};
+use std::ffi::OsStr;
+use std::fs;
+use std::path::{Path, PathBuf};
 
-use crate::config::ExtractionConfig;
-use crate::source::parse_source_as_hashset;
-use crate::{error::ExtractionError, extractor::extract_text};
 use colored::Colorize;
-use std::collections::HashSet;
-use std::{
-    collections::HashMap,
-    ffi::OsStr,
-    fs,
-    path::{Path, PathBuf},
-};
 use tokenizers::Tokenizer;
 use yaml_rust::{Yaml, YamlLoader};
+
+use crate::config::{DedupeConfig, DownloadConfig, ExtractionConfig};
+use crate::deduplication::{exact_deduplication, fuzzy_deduplication};
+use crate::downloader::download_repos;
+use crate::source::parse_source;
+use crate::source::parse_source_as_hashset;
+use crate::{error::ExtractionError, extractor::extract_text};
 
 pub fn listdir(dir: &Path, match_extension: String) -> Result<Vec<PathBuf>, ExtractionError> {
     let mut files: Vec<PathBuf> = Vec::new();
@@ -123,7 +123,23 @@ pub fn filter_listdir_by_source(
     Ok(filtered)
 }
 
-pub async fn run(ctx: &ExtractionConfig) {
+pub async fn download(ctx: &DownloadConfig) {
+    // read source file
+    let uris: Vec<(String, String)> = parse_source(&ctx.source);
+    if uris.is_empty() {
+        eprintln!(
+            "{} No valid URIs found in source file",
+            "[WARNING]".truecolor(214, 143, 0)
+        );
+    }
+
+    // Download
+    download_repos(uris, &ctx.zip_dir, &ctx.user_agent, ctx.workers)
+        .await
+        .expect("No content has been downloaded.");
+}
+
+pub async fn extract(ctx: &ExtractionConfig) {
     // List zip dir
     let paths = match listdir(&ctx.zip_dir, "zip".to_string()) {
         Ok(paths) => paths,
@@ -158,4 +174,47 @@ pub async fn run(ctx: &ExtractionConfig) {
 
     // Extract
     let _ = extract_text(&ctx.jsonl_dir, paths, ext_file_types, gpt2tokenizer);
+}
+
+pub async fn dedupe(ctx: &DedupeConfig) {
+    // List zip dir
+    let paths = match listdir(&ctx.jsonl_dir, "jsonl".to_string()) {
+        Ok(paths) => paths,
+        Err(e) => {
+            eprintln!("{} {}", "[WARNING]".truecolor(214, 143, 0), e);
+            return;
+        }
+    };
+
+    // Filter zip files for those ennumerated in source file
+    let repos_hs = parse_source_as_hashset(&ctx.source);
+    let paths = match filter_listdir_by_source(&paths, &repos_hs) {
+        Ok(paths) => paths,
+        Err(e) => {
+            eprintln!("{} {}", "[WARNING]".truecolor(214, 143, 0), e);
+            return;
+        }
+    };
+
+    exact_deduplication(&paths, &ctx.exact_dedup_dir);
+
+    // List zip dir
+    let paths = match listdir(&ctx.exact_dedup_dir, "jsonl".to_string()) {
+        Ok(paths) => paths,
+        Err(e) => {
+            eprintln!("{} {}", "[WARNING]".truecolor(214, 143, 0), e);
+            return;
+        }
+    };
+
+    // Filter zip files for those ennumerated in source file
+    let repos_hs = parse_source_as_hashset(&ctx.source);
+    let paths = match filter_listdir_by_source(&paths, &repos_hs) {
+        Ok(paths) => paths,
+        Err(e) => {
+            eprintln!("{} {}", "[WARNING]".truecolor(214, 143, 0), e);
+            return;
+        }
+    };
+    fuzzy_deduplication(&paths, &ctx.dest_dir);
 }
