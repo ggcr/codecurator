@@ -157,21 +157,3 @@ pub fn exact_deduplication(jsonl_paths: &Vec<PathBuf>, ddest: &Path) {
 
     println!("Exact dedup written to {}", destination_dir.display());
 }
-
-pub fn fuzzy_deduplication(jsonl_paths: &Vec<PathBuf>, ddest: &Path) {
-    println!(
-        "Starting Fuzzy deduplication on {} files",
-        jsonl_paths.len()
-    );
-
-    let records: Vec<Record> = jsonl_paths
-        .par_iter()
-        .filter_map(|path| read_records(path).ok())
-        .flatten()
-        .collect();
-
-    println!("Loaded {} documents", records.len());
-
-    let destination_dir = ddest;
-    fs::create_dir_all(&destination_dir).expect("Unable to create deduplication dir");
-}

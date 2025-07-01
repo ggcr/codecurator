@@ -207,3 +207,33 @@ pub fn extract_text(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_parse_ext() {
+        // Create a mock ZipFile somehow, or test the logic
+        // This might be tricky with ZipFile, so consider refactoring
+        // to extract the logic into a testable function
+    }
+
+    #[test]
+    fn test_record_creation() {
+        let record = Record {
+            text: "fn main() {}".to_string(),
+            id: "test-id".to_string(),
+            file_extension: ".rs".to_string(),
+            category: "programming".to_string(),
+            file_path: "test.rs".to_string(),
+            size_in_bytes: 13,
+            file_name: "test.rs".to_string(),
+            tokens: 5,
+        };
+
+        assert_eq!(record.tokens, 5);
+        assert_eq!(record.file_extension, ".rs");
+    }
+}
