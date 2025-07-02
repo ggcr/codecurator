@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{fs, process};
 
 use colored::Colorize;
 use tokenizers::Tokenizer;
@@ -125,7 +125,13 @@ pub fn filter_listdir_by_source(
 
 pub async fn download(ctx: &DownloadConfig) {
     // read source file
-    let uris: Vec<(String, String)> = parse_source(&ctx.source);
+    let uris: Vec<(String, String)> = match parse_source(&ctx.source) {
+        Ok(uris) => uris,
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
+    };
     if uris.is_empty() {
         eprintln!(
             "{} No valid URIs found in source file",
