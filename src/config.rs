@@ -50,7 +50,12 @@ impl DownloadConfig {
             workers,
         } = opts_cmd
         {
+            let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
             config.source = source.to_owned();
+            if let Some(name) = source.file_stem() {
+                let name = name.to_string_lossy();
+                config.zip_dir = project_root.join(format!("zip/{name}")).to_owned();
+            }
             if let Some(z) = zip_dir {
                 config.zip_dir = z.to_owned();
             }
