@@ -38,12 +38,10 @@ fn parse_line(line: &str) -> Result<Repo, SourceError> {
 
 pub fn parse_source(source: &PathBuf) -> Result<Vec<(String, String)>, SourceError> {
     let input = fs::read_to_string(source)?;
-    println!("{:?}", input);
 
     let mut valid_repos: Vec<(String, String)> = Vec::new();
     for line in serde_json::Deserializer::from_str(&input).into_iter::<&str>() {
         // Check that the retrieved line with serde is valid
-        println!("{:?}", line);
         let valid_line = line.map_err(SourceError::InvalidJsonLine)?;
         if let Ok(repo) = parse_line(valid_line) {
             valid_repos.push((repo.user, repo.name));

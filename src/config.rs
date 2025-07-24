@@ -30,9 +30,10 @@ pub struct DedupeConfig {
 
 impl Default for DownloadConfig {
     fn default() -> Self {
+        let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         Self {
-            source: PathBuf::from("./config/example.jsonl"),
-            zip_dir: PathBuf::from("./zip"),
+            source: project_root.join("config/example.jsonl"),
+            zip_dir: project_root.join("zip"),
             user_agent: "CodeCurator".to_string(),
             workers: 16,
         }
