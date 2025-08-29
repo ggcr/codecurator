@@ -1,5 +1,4 @@
 # CodeCurator
-![Visitors](https://visitor-badge.laobi.icu/badge?page_id=ggcr.codecurator)
 
 An end-to-end tool for curating GitHub repositories into structured code datasets.
 
@@ -62,3 +61,6 @@ Total records: 110645
 $ bash stats/count_tokens.sh ./dedup/
 Total tokens: 346574283
 ```
+
+![Visitors](https://visitor-badge.laobi.icu/badge?page_id=ggcr.codecurator)
+
