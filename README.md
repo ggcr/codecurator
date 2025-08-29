@@ -1,4 +1,6 @@
 # CodeCurator
+![Visitors](https://visitor-badge.laobi.icu/badge?page_id=ggcr.codecurator)
+
 An end-to-end tool for curating GitHub repositories into structured code datasets.
 
 - **Fast parallel processing** - Download and extract with configurable workers
