@@ -135,7 +135,7 @@ fn extract_zip(
         };
         if file.is_file()
                 && file.size() <= 2u64.pow(17) // 128KB
-                && file_types.contains_key(&ext)
+                // && file_types.contains_key(&ext)
         {
             // Parse file
             let r = match process_valid_file(&mut file, tokenizer, ext) {
