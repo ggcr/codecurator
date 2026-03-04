@@ -210,8 +210,8 @@ pub fn extract_text(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use tempfile::tempdir;
+    use crate::extractor::Record;
+
 
     #[test]
     fn test_parse_ext() {

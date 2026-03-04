@@ -56,7 +56,7 @@ async fn download_repo_zip(
 
     // Fetch the latest commit SHA and check if we have it in local
     if let Some(etag) = get_etag(&client, &url).await {
-        filepath = format!("./zip/{}-{}_{}.zip", user, repo, etag);
+        filepath = format!("./zip/{}-{}.zip", user, repo);
         if tokio::fs::try_exists(&filepath).await.unwrap_or(false) {
             return Ok(PathBuf::from(&filepath));
         }
