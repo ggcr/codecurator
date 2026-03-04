@@ -43,6 +43,7 @@ async fn download_repo_zip(
     user: &String,
     repo: &String,
     branch: &str,
+    zip_dir: &PathBuf,
 ) -> Result<PathBuf, DownloadError> {
     let client = reqwest::Client::new();
 
@@ -52,28 +53,30 @@ async fn download_repo_zip(
         user, repo, branch
     );
 
-    let mut filepath = format!("./zip/{}-{}.zip", user, &repo);
+    let mut filepath = zip_dir.join(format!("{}-{}.zip", user, repo));
 
     // Fetch the latest commit SHA and check if we have it in local
-    if let Some(etag) = get_etag(&client, &url).await {
-        filepath = format!("./zip/{}-{}.zip", user, repo);
+    if let Some(_etag) = get_etag(&client, &url).await {
+        filepath = zip_dir.join(format!("{}-{}.zip", user, repo));
         if tokio::fs::try_exists(&filepath).await.unwrap_or(false) {
-            return Ok(PathBuf::from(&filepath));
+            return Ok(filepath);
         }
     }
 
     let content = download_bytes(&client, &url).await?;
 
+    let filepath_str = filepath.to_string_lossy().to_string();
+
     // Check the checksum between content (Bytes) and the file in disk
     if tokio::fs::try_exists(&filepath).await.unwrap_or(false)
-        && are_equal(content.clone(), &filepath).await.is_ok_and(|r| r)
+        && are_equal(content.clone(), &filepath_str).await.is_ok_and(|r| r)
     {
-        return Ok(PathBuf::from(&filepath));
+        return Ok(filepath);
     }
 
-    write_bytes_to_file(&filepath, content).await?;
+    write_bytes_to_file(&filepath_str, content).await?;
 
-    Ok(PathBuf::from(&filepath))
+    Ok(filepath)
 }
 
 pub async fn download_repos(
@@ -87,13 +90,16 @@ pub async fn download_repos(
     fs::create_dir_all(destination_dir)?;
 
     // We try first downloading from main, if err, we try on master
-    let futures = futures::stream::iter(uris.into_iter().map(|(user, repo)| async move {
+    let zip_dir = destination_dir.clone();
+    let futures = futures::stream::iter(uris.into_iter().map(move |(user, repo)| {
+        let zip_dir = zip_dir.clone();
+        async move {
         let result = async {
-            match download_repo_zip(&user, &repo, "main").await {
+            match download_repo_zip(&user, &repo, "main", &zip_dir).await {
                 Ok(path) => Ok(path),
                 Err(_) => {
                     sleep(Duration::from_secs(1)).await;
-                    download_repo_zip(&user, &repo, "master").await
+                    download_repo_zip(&user, &repo, "master", &zip_dir).await
                 }
             }
         }
@@ -109,7 +115,7 @@ pub async fn download_repos(
                 Err(e)
             }
         }
-    }))
+    }}))
     .buffer_unordered(workers)
     .collect::<Vec<_>>()
     .await;
